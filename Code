@@ -1,0 +1,92 @@
+#include <LiquidCrystal.h>
+
+// LCD Setup (RS, E, D4, D5, D6, D7)
+LiquidCrystal lcd(7, 8, 9, 10, 11, 12);
+
+#define LDR_PIN A0       // Photoresistor (LDR)
+#define BUZZER_PIN 5     // Buzzer for alert
+#define LED_PIN 6        // LED for alert
+
+int beatCount = 0;
+unsigned long lastBeatTime = 0;
+float bpm = 0;
+unsigned long startTime = 0;
+
+void setup() {
+    pinMode(LDR_PIN, INPUT);
+    pinMode(BUZZER_PIN, OUTPUT);
+    pinMode(LED_PIN, OUTPUT);
+    
+    lcd.begin(16, 2);
+    lcd.print("Heart Rate Mon.");
+    delay(2000);
+    lcd.clear();
+    
+    Serial.begin(9600); // Debugging
+    startTime = millis();  // Start time for BPM calculation
+}
+
+void loop() {
+    int sensorValue = analogRead(LDR_PIN);  // Read LDR
+
+    Serial.print("LDR Value: ");
+    Serial.println(sensorValue);  // Check values in Serial Monitor
+
+    // Detect heartbeat when light drops below a threshold
+    if (sensorValue < 500) {  
+        if (millis() - lastBeatTime > 250) {  // Faster detection
+            beatCount++;
+            lastBeatTime = millis();
+            Serial.println("Heartbeat detected!");  
+        }
+    }
+
+    // Calculate BPM every 10 seconds
+    if (millis() - startTime >= 10000) {
+        bpm = (beatCount * 6);  // Convert to BPM
+        beatCount = 0;
+        startTime = millis();  // Reset start time
+
+        Serial.print("Calculated BPM: ");
+        Serial.println(bpm);
+
+        // Force LCD to update correctly
+        lcd.clear();
+        delay(200);
+        lcd.setCursor(0, 0);
+        lcd.print("BPM: ");
+        lcd.print(bpm);
+
+        // 🚀 **Correct BPM Classification**
+        if (bpm >= 60 && bpm <= 100) {
+            lcd.setCursor(0, 1);
+            lcd.print("Normal BPM");
+        } else {
+            String alertMsg;
+            if (bpm < 60) {
+                alertMsg = "Low BPM! (Brady) ";
+            } else {
+                alertMsg = "High BPM! (Tachy) ";
+            }
+
+            // 🚀 Scroll Message for Low & High BPM
+            for (int i = 0; i < alertMsg.length() - 15; i++) {
+                lcd.setCursor(0, 1);
+                lcd.print(alertMsg.substring(i, i + 16));
+                delay(300);
+            }
+
+            // 🚨 Blink LED & Sound Buzzer 🚨
+            for (int i = 0; i < 4; i++) {  
+                digitalWrite(BUZZER_PIN, HIGH);
+                digitalWrite(LED_PIN, HIGH);
+                delay(500);
+                digitalWrite(BUZZER_PIN, LOW);
+                digitalWrite(LED_PIN, LOW);
+                delay(500);
+            }
+        }
+    }
+
+    delay(100);  // Small delay to stabilize readings
+}
